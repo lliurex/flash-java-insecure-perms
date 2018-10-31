@@ -2,14 +2,11 @@ Source: flash-java-insecure-perms
 Section: utils
 Priority: optional
 Maintainer: M.Angel Juan <m.angel.juan@gmail.com>
-Build-Depends: debhelper (>=9)
-Standards-Version: 3.9.6
-Homepage: <insert the upstream URL, if relevant>
-#Vcs-Git: git://anonscm.debian.org/collab-maint/flash-java-insecure-perms.git
-#Vcs-Browser: https://anonscm.debian.org/cgit/collab-maint/flash-java-insecure-perms.git
+Build-Depends: debhelper (>=10)
+Standards-Version: 4.1.2
 
 Package: flash-java-insecure-perms
 Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends}, debconf (>= 0.2.26)
-Description: <insert up to 60 chars description>
- <insert long description, indented with spaces>
+Description: Configure flash and java perms
+ Configure flash and java perms
