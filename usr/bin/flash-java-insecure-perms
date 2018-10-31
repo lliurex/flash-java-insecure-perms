@@ -1,0 +1,167 @@
+#!/bin/bash
+#0 = autosize
+HEIGHT=0
+WIDTH=0
+LIST_HEIGHT=0
+
+
+ICED=$(which itweb-settings)
+KEYTOOL=$(which keytool)
+IAM=$(id -u)
+MYNAME=$(id -un)
+
+if [ "${IAM}" = "0" ]; then
+    USERS=$(getent passwd |cut -d: -f4|sort -h|uniq|egrep ^[0-9]{4}|xargs -n1 getent passwd|cut -d: -f1)
+    if [ "x$1" = "xinstall" ]; then
+
+	OLDIFS=$IFS;
+	IFS=$'\n'
+	for x in ${USERS} ; do 
+	    #str+=( $(printf '%10.10s' $x) $(printf '%30.30s' " ") $(printf '%10.10s' "on"))
+	    str+=( $x  " " off )
+	done
+
+	DIALOG=$(whiptail --separate-output --title "Users selection" --checklist "Select users to modify flash/java settings" $HEIGHT $WIDTH $LIST_HEIGHT ${str[@]} 3>&1 1>&2 2>&3)
+	ret=$?
+
+	IFS=$OLDIFS;
+    
+	if [ $ret != 0 ]; then
+	echo Canceled!
+	fi
+    fi
+else
+    USERS=${MYNAME}
+    DIALOG=${MYNAME}
+fi
+
+CERTPATHS=".config/icedtea-web/security .java/deployment/security"
+DONE=0
+if [ "x$1" = "xinstall" ]; then
+
+for user in ${DIALOG}; do
+    DATE=$(date '+%Y%m%d%H%M%S')
+
+    if [ ! -f "/home/$user/.config/unsec_settings_on" ]; then
+	# JAVA
+	if [ ! -z "${ICED}" ]; then
+	    if [ "${IAM}" = "0" ];then
+		sudo su $user bash -c "${ICED} -headless set deployment.security.level ALLOW_UNSIGNED" 
+	    else
+		${ICED} -headless set deployment.security.level ALLOW_UNSIGNED
+	    fi
+	fi
+	for cert in $(find /usr/share/flash-java-insecure-perms/ -name '*.cert');do 
+	    certname=$(basename ${cert%%.cert})
+	    #echo Importing into trusted.certs ${certname}.cert
+	    for certpath in ${CERTPATHS}; do 
+		if [ ! -f "/home/$user/${certpath}/trusted.certs" ]; then
+		    mkdir -p /home/$user/${certpath}
+		    ${KEYTOOL} -genkey -alias recursos -keyalg RSA -keystore /home/$user/${certpath}/trusted.certs -keypass changeit -storepass changeit -keysize 2048 -dname "CN=Unknown, OU=Unknown, O=Unknown, L=Unknown, ST=Unknown, C=Unknown" > /dev/null 2> /dev/null
+		    ${KEYTOOL} -delete -alias recursos -keystore /home/$user/${certpath}/trusted.certs -storepass changeit > /dev/null 2> /dev/null
+		    if [ "${IAM}" = "0" ]; then
+			chown -R ${user}:${user} /home/$user/${certpath}/
+		    fi
+		fi
+		$KEYTOOL -importcert -trustcacerts -storepass "changeit" -keystore /home/$user/${certpath}/trusted.certs -file ${cert} -alias ${certname} -noprompt > /dev/null 2> /dev/null
+	    done
+	done
+	#FLASH
+	if [ ! -d "/home/$user/.macromedia/Flash_Player/macromedia.com/support/flashplayer/sys" ]; then
+	    mkdir -p /home/$user/.macromedia/Flash_Player/macromedia.com/support/flashplayer/sys
+	fi
+	if [ ! -d "/home/$user/.macromedia/Flash_Player/#Security/FlashPlayerTrust" ]; then
+	    mkdir -p "/home/$user/.macromedia/Flash_Player/#Security/FlashPlayerTrust"
+	fi
+	if [ -f "/home/$user/.macromedia/Flash_Player/macromedia.com/support/flashplayer/sys/settings.sol" ]; then
+	    mv /home/$user/.macromedia/Flash_Player/macromedia.com/support/flashplayer/sys/settings.sol /home/$user/.macromedia/Flash_Player/macromedia.com/support/flashplayer/sys/settings-${DATE}.sol
+	fi
+	if [ -f "/home/$user/.macromedia/Flash_Player/#Security/FlashPlayerTrust/recursos.cfg" ]; then
+	    mv "/home/$user/.macromedia/Flash_Player/#Security/FlashPlayerTrust/recursos.cfg" "/home/$user/.macromedia/Flash_Player/#Security/FlashPlayerTrust/recursos-${DATE}.cfg"
+	fi
+	cp /usr/share/flash-java-insecure-perms/settings.sol /home/$user/.macromedia/Flash_Player/macromedia.com/support/flashplayer/sys
+	cp /usr/share/flash-java-insecure-perms/recursos.cfg "/home/$user/.macromedia/Flash_Player/#Security/FlashPlayerTrust/recursos.cfg"
+	chown -R ${user}:${user} /home/$user/.macromedia
+	touch /home/$user/.config/unsec_settings_on
+	#FIREFOX
+	if [ ! -d "/home/$user/.mozilla" ]; then 
+	    mkdir -p /home/$user/.mozilla
+	    if [ "${IAM}" = "0" ]; then
+		chown -R ${user}:${user} /home/$user/.mozilla
+		sudo su $user bash -c "firefox" &
+	    else
+		firefox &
+	    fi
+	    sleep 2
+	fi
+	$(pkill -u $user --signal 9 firefox >/dev/null 2>/dev/null) >/dev/null 2>/dev/null
+	for pref in $(find /home/$user/.mozilla -name 'prefs.js'); do
+	    sed -i -r 's%.*plugin\.state\.java.*%%' $pref
+	    sed -i -r 's%.*plugin\.state\.flash.*%%' $pref
+	    sed -i -r 's%.*plugins\.click_to_play.*%%' $pref
+	    sed -i -r 's%.*plugins\.hide_infobar_for_outdated_plugin.*%%' $pref
+	    sed -i -r 's%.*extensions\.blocklist\.enabled.*%%' $pref
+	    # USE ECHO WHEN THERE ISN'T SOME SETTING INTO FILE
+	    echo 'user_pref("plugin.state.java",2);' >> $pref
+	    echo 'user_pref("plugin.state.flash",2);' >> $pref
+	    echo 'user_pref("plugins.click_to_play",false);' >> $pref
+	    echo 'user_pref("plugins.hide_infobar_for_outdated_plugin",true);' >> $pref
+	    echo 'user_pref("extensions.blocklist.enabled",false);' >> $pref
+	done
+    else
+	    echo Already configured!
+    fi
+done
+
+DONE=1
+fi
+
+if [ "x$1" = "xdeinstall" ]; then
+
+    for user in ${USERS}; do
+	if [ -f "/home/$user/.config/unsec_settings_on" ]; then
+	    echo Deconfiguring $user!
+	    #FLASH
+	    file1=$(find /home/$user/.macromedia/Flash_Player/macromedia.com/support/flashplayer/sys -maxdepth 1 -name '*.sol'|grep 'settings-'|sort -h|uniq|head -1)
+	    if [ ! -z "$file1" ]; then
+		mv $file1 /home/$user/.macromedia/Flash_Player/macromedia.com/support/flashplayer/sys/settings.sol
+	    fi
+	    if [ -f "/home/$user/.macromedia/Flash_Player/#Security/FlashPlayerTrust/recursos.cfg" ]; then 
+		rm -f "/home/$user/.macromedia/Flash_Player/#Security/FlashPlayerTrust/recursos.cfg"
+	    fi
+	    #JAVA
+	    if [ ! -z "${ICED}" ]; then
+		if [ "${IAM}" = "0" ];then
+		    sudo su $user bash -c "${ICED} -headless reset deployment.security.level" 
+		else
+		    ${ICED} -headless reset deployment.security.level
+		fi
+	    fi
+	    for cert in $(find /usr/share/flash-java-insecure-perms/ -name '*.cert');do 
+		certname=$(basename ${cert%%.cert})
+		#echo Deleting ${certname}.cert from trusted.certs 
+		for certpath in ${CERTPATHS}; do 
+		    if [ -f "/home/$user/${certpath}/trusted.certs" ]; then
+			$KEYTOOL -delete -storepass "changeit" -keystore /home/$user/${certpath}/trusted.certs -alias ${certname} > /dev/null 2> /dev/null
+		    fi
+		done
+	    done
+	    rm /home/$user/.config/unsec_settings_on
+	    $(pkill -u $user --signal 9 firefox  >/dev/null 2>/dev/null) >/dev/null 2>/dev/null
+	    for pref in $(find /home/$user/.mozilla -name 'prefs.js'); do
+		sed -i -r 's%.*plugin\.state\.java.*%user_pref("plugin.state.java",1);%' $pref
+		sed -i -r 's%.*plugin\.state\.flash.*%user_pref("plugin.state.flash",1);%' $pref
+		sed -i -r 's%.*plugins\.click_to_play.*%user_pref("plugins.click_to_play",true);%' $pref
+		sed -i -r 's%.*plugins\.hide_infobar_for_outdated_plugin.*%user_pref("plugins.hide_infobar_for_outdated_plugin",false);%' $pref
+		sed -i -r 's%.*extensions\.blocklist\.enabled.*%user_pref("extensions.blocklist.enabled",true);%' $pref
+	    done
+	fi
+    done
+DONE=1
+fi
+
+if [ ${DONE} -eq 0 ]; then
+    echo "$(basename $0) help"
+    echo "$(basename $0) [ install | deinstall ]"
+    echo "Changes permission to allow some educational resources with java/flash"
+fi
