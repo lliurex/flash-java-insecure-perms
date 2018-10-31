@@ -1,0 +1,29 @@
+flash-java-insecure-perms (0.3) xenial; urgency=medium
+
+  * Add new settings 
+
+ -- M.Angel Juan <m.angel.juan@gmail.com>  Thu, 27 Oct 2016 13:52:32 +0200
+
+flash-java-insecure-perms (0.2) xenial; urgency=medium
+
+  * Allow oracle java
+
+ -- M.Angel Juan <m.angel.juan@gmail.com>  Thu, 27 Oct 2016 13:30:11 +0200
+
+flash-java-insecure-perms (0.1-1) xenial; urgency=medium
+
+  * Add new conditions
+
+ -- M.Angel Juan <m.angel.juan@gmail.com>  Thu, 27 Oct 2016 11:52:16 +0200
+
+flash-java-insecure-perms (0.1) xenial; urgency=medium
+
+  * Configure plugins to run smoothly educational resources
+
+ -- M.Angel Juan <m.angel.juan@gmail.com>  Mon, 24 Oct 2016 18:24:17 +0200
+
+flash-java-insecure-perms (0.0.1) unstable; urgency=medium
+
+  * Initial Release.
+
+ -- M.Angel Juan <m.angel.juan@gmail.com>  Mon, 24 Oct 2016 13:25:43 +0200
